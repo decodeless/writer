@@ -54,9 +54,9 @@ template <TriviallyDestructible T>
 struct mapped_file_allocator : public aligned_allocator_ref<T, mapped_file_memory_resource> {
     using aligned_allocator_ref<T, mapped_file_memory_resource>::aligned_allocator_ref;
     [[nodiscard]] constexpr T* reallocate(T* ptr, std::size_t bytes) {
-        return static_cast<T*>(this->m_resource.reallocate(ptr, bytes));
+        return static_cast<T*>(this->m_resource->reallocate(ptr, bytes));
     }
-    constexpr size_t max_size() const { return this->m_resource.max_size(); }
+    constexpr size_t max_size() const { return this->m_resource->max_size(); }
 };
 
 static_assert(CanReallocate<mapped_file_allocator<std::byte>>);
@@ -71,11 +71,20 @@ public:
         , m_linearResource(initialSize, m_fileResource) {}
     ~Writer() {
         // Truncate down to what was allocated
-        m_fileResource.resize(m_linearResource.bytesAllocated());
+        if (m_resizeOnDestruct)
+            m_fileResource.resize(m_linearResource.bytesAllocated());
     }
-
-    // TODO: not impossible. depends on linear_memory_resource
-    Writer& operator=(Writer&& other) = delete;
+    Writer(Writer&& other) noexcept
+        : m_fileResource(std::move(other.m_fileResource))
+        , m_linearResource(std::move(other.m_linearResource)) {
+        other.m_resizeOnDestruct = false;
+    }
+    Writer& operator=(Writer&& other) noexcept {
+        m_fileResource = std::move(other.m_fileResource);
+        m_linearResource = std::move(other.m_linearResource);
+        other.m_resizeOnDestruct = false;
+        return *this;
+    }
 
     template <class T, class... Args>
     T* create(Args&&... args) {
@@ -97,6 +106,11 @@ public:
     linear_memory_resource<mapped_file_allocator<std::byte>>& resource() {
         return m_linearResource;
     }
+    linear_allocator<std::byte, linear_memory_resource<mapped_file_allocator<std::byte>>>
+    allocator() {
+        return resource();
+    }
+    void*  data() const { return m_linearResource.arena(); }
     size_t size() const { return m_linearResource.bytesAllocated(); }
 
 private:
@@ -105,6 +119,9 @@ private:
 
     // Linear allocator, allocating blocks within m_file_resource
     linear_memory_resource<mapped_file_allocator<std::byte>> m_linearResource;
+
+    // Avoid resizing invalid objects after std::move()
+    bool m_resizeOnDestruct = true;
 };
 
 } // namespace decodeless
