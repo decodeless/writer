@@ -12,7 +12,7 @@ using namespace decodeless;
 TEST(Writer, Simple) {
     fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
     {
-        Writer writer(tmpFile, 4096, 4);
+        file_writer writer(tmpFile, 4096, 4);
         writer.create<int>(42);
     }
     {
@@ -25,7 +25,7 @@ TEST(Writer, Simple) {
 TEST(Writer, Realloc) {
     fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
     {
-        Writer writer(tmpFile, 4096, 4);
+        file_writer writer(tmpFile, 4096, 4);
         writer.createArray<int>(1000);
         writer.create<int>(42);
     }
@@ -46,7 +46,7 @@ struct TestHeader {
 TEST(Writer, Header) {
     fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
     {
-        Writer      writer(tmpFile, 4096, 4);
+        file_writer writer(tmpFile, 4096, 4);
         TestHeader* header = writer.create<TestHeader>();
         header->hello = writer.createArray("Hello World!");
         header->data = writer.create<int>(42);
