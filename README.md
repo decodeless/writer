@@ -20,12 +20,12 @@ structures in the file.
 
 ```
 struct Header {
-    offset_span<char> hello;
-    offset_ptr<int>   data;
+    decodeless::offset_span<char> hello;
+    decodeless::offset_ptr<int>   data;
 };
 
 size_t maxSize = 4096;  // or a terabyte :) - just reserves address space
-decodeless::Writer writer("myfile.dat", maxSize);
+decodeless::file_writer writer("myfile.dat", maxSize);
 
 // Add the above header to the file
 TestHeader* header = writer.create<TestHeader>();
@@ -45,6 +45,17 @@ decodeless::file reader("myfile.dat");
 const Header* header = reinterpret_cast<const Header*>(reader.data());
 EXPECT_EQ(*header->data, 42);
 ```
+
+If a temporary in-memory file is needed, `decodeless::memory_writer` is provided
+with the same interface as `decodeless::file_writer`. Note that the allocator is
+necessarily a different type since it is backed by
+`decodeless::resizable_memory` instead of `decodeless::resizable_file`, which
+means the same function cannot write to both a `file_writer` or a
+`memory_writer` without templating them. This is exactly why
+[`std::pmr::polymorphic_allocator`](https://en.cppreference.com/w/cpp/memory/polymorphic_allocator)
+was created. Thus, this library also provides `decodeless::pmr_file_writer` and
+`decodeless::pmr_memory_writer`, which both provide a common
+`std::pmr::memory_resource` compatible `resource()`.
 
 ## Contributing
 

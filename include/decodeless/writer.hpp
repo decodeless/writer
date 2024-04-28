@@ -10,31 +10,27 @@ namespace decodeless {
 
 namespace fs = std::filesystem;
 
-// Note: truncates the file on construction!
-class mapped_file_memory_resource {
+template <resizable_mapped_memory ResizableMemory>
+class growable_memory_resource : public ResizableMemory {
 public:
-    mapped_file_memory_resource(const fs::path& path, size_t maxSize)
-        : m_mappedFile(path, maxSize) {
-        // Truncate the file if it already exists
-        if (m_mappedFile.size() > 0)
-            m_mappedFile.resize(0);
-    }
+    using ResizableMemory::ResizableMemory;
 
     [[nodiscard]] void* allocate(std::size_t bytes, std::size_t align) {
-        if (m_mappedFile.size() != 0)
+        if (ResizableMemory::size() != 0)
             throw std::bad_alloc();
-        m_mappedFile.resize(bytes);
+        ResizableMemory::resize(bytes);
         // m_mappedFile mapping alignment should easily be big enough
-        if ((reinterpret_cast<uintptr_t>(m_mappedFile.data()) & (align - 1)) != 0)
+        if ((reinterpret_cast<uintptr_t>(ResizableMemory::data()) & (align - 1)) != 0)
             throw std::bad_alloc();
-        return m_mappedFile.data();
+        return ResizableMemory::data();
     }
 
-    [[nodiscard]] void* reallocate(void* ptr, std::size_t bytes) {
-        if (ptr != m_mappedFile.data())
+    [[nodiscard]] void* reallocate(void* ptr, std::size_t bytes,
+                                   [[maybe_unused]] std::size_t align) {
+        if (ptr != ResizableMemory::data())
             throw std::bad_alloc();
-        m_mappedFile.resize(bytes);
-        return m_mappedFile.data();
+        ResizableMemory::resize(bytes);
+        return ResizableMemory::data();
     }
 
     constexpr void deallocate(void* p, std::size_t bytes) {
@@ -43,48 +39,91 @@ public:
         (void)bytes;
     }
 
-    size_t max_size() const { return m_mappedFile.capacity(); }
-    void   resize(size_t size) { m_mappedFile.resize(size); }
-
-private:
-    resizable_file m_mappedFile;
+    size_t max_size() const { return ResizableMemory::capacity(); }
+    void   resize(size_t size) { ResizableMemory::resize(size); }
 };
 
-template <TriviallyDestructible T>
-struct mapped_file_allocator : public aligned_allocator_ref<T, mapped_file_memory_resource> {
-    using aligned_allocator_ref<T, mapped_file_memory_resource>::aligned_allocator_ref;
+// Note: truncates the file/memory on construction!
+class mapped_file_memory_resource : public growable_memory_resource<resizable_file> {
+public:
+    mapped_file_memory_resource(const fs::path& path, size_t maxSize)
+        : growable_memory_resource<resizable_file>(path, maxSize) {
+        // Truncate the file if it already exists
+        if (this->size() > 0)
+            this->resize(0);
+    }
+};
+
+static_assert(realloc_memory_resource<mapped_file_memory_resource>);
+static_assert(has_max_size<mapped_file_memory_resource>);
+
+class mapped_memory_memory_resource : public growable_memory_resource<resizable_memory> {
+public:
+    mapped_memory_memory_resource(size_t maxSize)
+        : growable_memory_resource<resizable_memory>(0, maxSize) {}
+};
+
+static_assert(realloc_memory_resource<mapped_memory_memory_resource>);
+static_assert(has_max_size<mapped_memory_memory_resource>);
+
+template <trivially_destructible T>
+struct mapped_file_allocator : public memory_resource_ref<T, mapped_file_memory_resource> {
+    using memory_resource_ref<T, mapped_file_memory_resource>::memory_resource_ref;
     [[nodiscard]] constexpr T* reallocate(T* ptr, std::size_t bytes) {
         return static_cast<T*>(this->m_resource->reallocate(ptr, bytes));
     }
     constexpr size_t max_size() const { return this->m_resource->max_size(); }
 };
 
-static_assert(CanReallocate<mapped_file_allocator<std::byte>>);
-static_assert(HasMaxSize<mapped_file_allocator<std::byte>>);
+static_assert(realloc_allocator<mapped_file_allocator<std::byte>>);
+static_assert(has_max_size<mapped_file_allocator<std::byte>>);
 
-class Writer {
+template <trivially_destructible T>
+struct mapped_memory_allocator : public memory_resource_ref<T, mapped_memory_memory_resource> {
+    using memory_resource_ref<T, mapped_memory_memory_resource>::memory_resource_ref;
+    [[nodiscard]] constexpr T* reallocate(T* ptr, std::size_t bytes) {
+        return static_cast<T*>(this->m_resource->reallocate(ptr, bytes));
+    }
+    constexpr size_t max_size() const { return this->m_resource->max_size(); }
+};
+
+static_assert(realloc_allocator<mapped_memory_allocator<std::byte>>);
+static_assert(has_max_size<mapped_memory_allocator<std::byte>>);
+
+// Wrapper around linear_memory_resource to truncate
+template <memory_resource_or_allocator ParentAllocator>
+class truncating_linear_memory_resource : public linear_memory_resource<ParentAllocator> {
 public:
-    static constexpr size_t INITIAL_SIZE =
-        linear_memory_resource<mapped_file_allocator<std::byte>>::INITIAL_SIZE;
-    Writer(const fs::path& path, size_t maxSize, size_t initialSize = INITIAL_SIZE)
-        : m_fileResource(path, maxSize)
-        , m_linearResource(initialSize, m_fileResource) {}
-    ~Writer() {
+    using linear_memory_resource<ParentAllocator>::linear_memory_resource;
+    ~truncating_linear_memory_resource() {
         // Truncate down to what was allocated
-        if (m_resizeOnDestruct)
-            m_fileResource.resize(m_linearResource.bytesAllocated());
+        if (m_truncateBackingOnDestruct)
+            this->m_parentAllocator.resize(this->bytesAllocated());
     }
-    Writer(Writer&& other) noexcept
-        : m_fileResource(std::move(other.m_fileResource))
-        , m_linearResource(std::move(other.m_linearResource)) {
-        other.m_resizeOnDestruct = false;
+    truncating_linear_memory_resource(truncating_linear_memory_resource&& other) noexcept
+        : linear_memory_resource<ParentAllocator>(std::move(other)) {
+        other.m_truncateBackingOnDestruct = false;
     }
-    Writer& operator=(Writer&& other) noexcept {
-        m_fileResource = std::move(other.m_fileResource);
-        m_linearResource = std::move(other.m_linearResource);
-        other.m_resizeOnDestruct = false;
-        return *this;
+    truncating_linear_memory_resource&
+    operator=(truncating_linear_memory_resource&& other) noexcept {
+        other.m_truncateBackingOnDestruct = false;
+        return linear_memory_resource<ParentAllocator>::operator=(std::move(other));
     }
+
+private:
+    // Avoid resizing invalid objects after std::move()
+    bool m_truncateBackingOnDestruct = true;
+};
+
+class file_writer {
+public:
+    using memory_resource_type = truncating_linear_memory_resource<mapped_file_memory_resource>;
+    static constexpr size_t INITIAL_SIZE = memory_resource_type::INITIAL_SIZE;
+    file_writer(const fs::path& path, size_t maxSize, size_t initialSize = INITIAL_SIZE)
+        : m_linearResource(initialSize, mapped_file_memory_resource(path, maxSize)) {}
+    memory_resource_type& resource() { return m_linearResource; }
+    void*                 data() const { return m_linearResource.arena(); }
+    size_t                size() const { return m_linearResource.bytesAllocated(); }
 
     template <class T, class... Args>
     T* create(Args&&... args) {
@@ -103,25 +142,39 @@ public:
     }
 #endif
 
-    linear_memory_resource<mapped_file_allocator<std::byte>>& resource() {
-        return m_linearResource;
+private:
+    memory_resource_type m_linearResource;
+};
+
+class memory_writer {
+public:
+    using memory_resource_type = truncating_linear_memory_resource<mapped_memory_memory_resource>;
+    static constexpr size_t INITIAL_SIZE = memory_resource_type::INITIAL_SIZE;
+    memory_writer(size_t maxSize, size_t initialSize = INITIAL_SIZE)
+        : m_linearResource(initialSize, mapped_memory_memory_resource(maxSize)) {}
+    memory_resource_type& resource() { return m_linearResource; }
+    void*                 data() const { return m_linearResource.arena(); }
+    size_t                size() const { return m_linearResource.bytesAllocated(); }
+
+    template <class T, class... Args>
+    T* create(Args&&... args) {
+        return decodeless::create<T>(resource(), std::forward<Args>(args)...);
     }
-    linear_allocator<std::byte, linear_memory_resource<mapped_file_allocator<std::byte>>>
-    allocator() {
-        return resource();
+
+    template <class T>
+    std::span<T> createArray(size_t size) {
+        return decodeless::createArray<T>(resource(), size);
     }
-    void*  data() const { return m_linearResource.arena(); }
-    size_t size() const { return m_linearResource.bytesAllocated(); }
+
+#ifdef __cpp_lib_ranges
+    template <std::ranges::input_range Range>
+    std::span<std::ranges::range_value_t<Range>> createArray(const Range& range) {
+        return decodeless::createArray(resource(), range);
+    }
+#endif
 
 private:
-    // Backing allocator
-    mapped_file_memory_resource m_fileResource;
-
-    // Linear allocator, allocating blocks within m_file_resource
-    linear_memory_resource<mapped_file_allocator<std::byte>> m_linearResource;
-
-    // Avoid resizing invalid objects after std::move()
-    bool m_resizeOnDestruct = true;
+    memory_resource_type m_linearResource;
 };
 
 } // namespace decodeless
