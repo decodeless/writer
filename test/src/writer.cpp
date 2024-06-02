@@ -2,6 +2,7 @@
 
 #include <decodeless/offset_ptr.hpp>
 #include <decodeless/offset_span.hpp>
+#include <decodeless/pmr_writer.hpp>
 #include <decodeless/writer.hpp>
 #include <filesystem>
 #include <fstream>
@@ -77,5 +78,50 @@ TEST(Writer, Header) {
                   40); // int is 4-byte aligned
         EXPECT_EQ(*header->data, 42);
     }
+    fs::remove(tmpFile);
+}
+
+void writeMyCustomObjectToFile(const decodeless::mapped_file_allocator<std::byte>& allocator) {
+    create::array<int>(allocator, 1000);
+    create::object<int>(allocator, 42);
+}
+
+void writeMyCustomObjectToMemory(const decodeless::mapped_memory_allocator<std::byte>& allocator) {
+    create::array<int>(allocator, 1000);
+    create::object(allocator, 42);
+}
+
+void writeMyCustomObject(const std::pmr::polymorphic_allocator<std::byte>& allocator) {
+    create::array<int>(allocator, 1000);
+    create::object(allocator, 42);
+}
+
+TEST(Writer, Allocators) {
+    fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
+
+    {
+        // templated file-only allocator
+        decodeless::file_writer fileWriter(tmpFile, 4096, 4);
+        writeMyCustomObjectToFile(fileWriter.resource());
+        EXPECT_EQ(reinterpret_cast<int*>(fileWriter.data())[1000], 42);
+    }
+
+    {
+        // templated memory-only allocator
+        decodeless::memory_writer memoryWriter(4096, 4);
+        writeMyCustomObjectToMemory(memoryWriter.resource());
+        EXPECT_EQ(reinterpret_cast<int*>(memoryWriter.data())[1000], 42);
+    }
+
+    {
+        // polymorphic allocator
+        decodeless::pmr_file_writer   pmrFileWriter(tmpFile, 4096, 4);
+        decodeless::pmr_memory_writer pmrMemoryWriter(4096, 4);
+        writeMyCustomObject(&pmrFileWriter.resource());
+        writeMyCustomObject(&pmrMemoryWriter.resource());
+        EXPECT_EQ(reinterpret_cast<int*>(pmrFileWriter.data())[1000], 42);
+        EXPECT_EQ(reinterpret_cast<int*>(pmrMemoryWriter.data())[1000], 42);
+    }
+
     fs::remove(tmpFile);
 }

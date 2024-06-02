@@ -7,7 +7,7 @@ memory mapping. Components can be used individually or combined.
 `decodeless_writer` combines
 [`decodeless_allocator`](https://github.com/decodeless/allocator) with
 [`decodeless_mappedfile`](https://github.com/decodeless/mappedfile) to provide a
-cross platform class `decodeless::Writer` to easily creting a binary file using
+cross platform class `decodeless::Writer` to easily creating a binary file using
 memory mapping. The file automatically grows in size (up to a user provided
 maximum, limited only by the virtual address space). The allocator provides
 alignment so the file can be read directly after memory mapping.
@@ -56,6 +56,31 @@ means the same function cannot write to both a `file_writer` or a
 was created. Thus, this library also provides `decodeless::pmr_file_writer` and
 `decodeless::pmr_memory_writer`, which both provide a common
 `std::pmr::memory_resource` compatible `resource()`.
+
+```
+void writeMyCustomObjectToFile(const decodeless::mapped_file_allocator<std::byte>& allocator);
+void writeMyCustomObjectToMemory(const decodeless::mapped_memory_allocator<std::byte>& allocator);
+
+// Generic :) at the slight cost of a vtable, but up to you!
+void writeMyCustomObject(const std::pmr::polymorphic_allocator<std::byte>& allocator);
+
+int main()
+{
+    // templated file-only allocator
+    decodeless::file_writer fileWriter(filename, maxSize, initialSize);
+    writeMyCustomObjectToFile(&fileWriter.resource());
+
+    // templated memory-only allocator
+    decodeless::memory_writer memoryWriter(maxSize, initialSize);
+    writeMyCustomObjectToMemory(&memoryWriter.resource());
+
+    // polymorphic allocators
+    decodeless::pmr_file_writer   pmrFileWriter(filename, maxSize, initialSize);
+    decodeless::pmr_memory_writer pmrMemoryWriter(maxSize, initialSize);
+    writeMyCustomObject(&pmrFileWriter.resource());
+    writeMyCustomObject(&pmrMemoryWriter.resource());
+}
+```
 
 ## Contributing
 

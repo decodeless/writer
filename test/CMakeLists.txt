@@ -60,6 +60,16 @@ else()
                             $<$<CONFIG:Debug>:stdc++_libbacktrace>)
     endif()
   endif()
+
+  # Ignore "may be used uninitialized" in MemoryMap(MemoryMap&& other) noexcept
+  # I'm like 90% sure this is just a gcc bug. gcc 10, 12 and clang have no
+  # issues
+  if(CMAKE_COMPILER_IS_GNUCC
+     AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 11
+     AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS 12)
+    target_compile_options(${PROJECT_NAME}_tests
+                           PRIVATE -Wno-error=maybe-uninitialized)
+  endif()
 endif()
 
 include(GoogleTest)

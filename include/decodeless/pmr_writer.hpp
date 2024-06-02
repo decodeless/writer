@@ -13,15 +13,15 @@ namespace decodeless {
 
 class pmr_file_writer {
 public:
-    using memory_resource_type =
-        memory_resource_adapter<truncating_linear_memory_resource<mapped_file_memory_resource>>;
-    static constexpr size_t INITIAL_SIZE =
-        truncating_linear_memory_resource<mapped_file_memory_resource>::INITIAL_SIZE;
+    using memory_resource_type = memory_resource_adapter<linear_file_memory_resource>;
+    using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
+    static constexpr size_t INITIAL_SIZE = linear_file_memory_resource::INITIAL_SIZE;
     pmr_file_writer(const fs::path& path, size_t maxSize, size_t initialSize = INITIAL_SIZE)
         : m_linearResource(initialSize, mapped_file_memory_resource(path, maxSize)) {}
-    memory_resource_type& resource() { return m_linearResource; }
-    void*                 data() const { return m_linearResource.backing_resource().data(); }
-    size_t                size() const { return m_linearResource.backing_resource().size(); }
+    [[nodiscard]] memory_resource_type& resource() { return m_linearResource; }
+    [[nodiscard]] allocator_type        allocator() { return &m_linearResource; }
+    [[nodiscard]] void*  data() const { return m_linearResource.backing_resource().data(); }
+    [[nodiscard]] size_t size() const { return m_linearResource.backing_resource().size(); }
 
     template <class T, class... Args>
     T* create(Args&&... args) {
@@ -55,14 +55,16 @@ private:
 class pmr_memory_writer {
 public:
     using memory_resource_type =
-        memory_resource_adapter<truncating_linear_memory_resource<mapped_memory_memory_resource>>;
+        memory_resource_adapter<linear_memory_resource<mapped_memory_memory_resource>>;
+    using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
     static constexpr size_t INITIAL_SIZE =
-        truncating_linear_memory_resource<mapped_memory_memory_resource>::INITIAL_SIZE;
+        linear_memory_resource<mapped_memory_memory_resource>::INITIAL_SIZE;
     pmr_memory_writer(size_t maxSize, size_t initialSize = INITIAL_SIZE)
         : m_linearResource(initialSize, mapped_memory_memory_resource(maxSize)) {}
-    memory_resource_type& resource() { return m_linearResource; }
-    void*                 data() const { return m_linearResource.backing_resource().data(); }
-    size_t                size() const { return m_linearResource.backing_resource().size(); }
+    [[nodiscard]] memory_resource_type& resource() { return m_linearResource; }
+    [[nodiscard]] allocator_type        allocator() { return &m_linearResource; }
+    [[nodiscard]] void*  data() const { return m_linearResource.backing_resource().data(); }
+    [[nodiscard]] size_t size() const { return m_linearResource.backing_resource().size(); }
 
     template <class T, class... Args>
     T* create(Args&&... args) {
