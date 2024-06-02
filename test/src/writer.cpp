@@ -1,11 +1,12 @@
 // Copyright (c) 2024 Pyarelal Knowles, MIT License
 
-#include <filesystem>
-#include <gmock/gmock.h>
-#include <gtest/gtest.h>
-#include <decodeless/writer.hpp>
 #include <decodeless/offset_ptr.hpp>
 #include <decodeless/offset_span.hpp>
+#include <decodeless/writer.hpp>
+#include <filesystem>
+#include <fstream>
+#include <gmock/gmock.h>
+#include <gtest/gtest.h>
 
 using namespace decodeless;
 
@@ -28,6 +29,15 @@ TEST(Writer, Realloc) {
         file_writer writer(tmpFile, 4096, 4);
         writer.createArray<int>(1000);
         writer.create<int>(42);
+    }
+    {
+        ASSERT_EQ(std::filesystem::file_size(tmpFile), 1001 * sizeof(int));
+        std::ifstream    f(tmpFile, std::ios::binary);
+        ASSERT_TRUE(f.good());
+        std::vector<int> ints(1001);
+        f.read(reinterpret_cast<char*>(ints.data()), 1001 * sizeof(int));
+        EXPECT_TRUE(f.good());
+        EXPECT_EQ(ints[ints.size() - 1], 42);
     }
     {
         file      mapped(tmpFile);
