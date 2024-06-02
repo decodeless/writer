@@ -22,7 +22,7 @@ if(NOT TARGET decodeless::offset_ptr)
     FetchContent_Declare(
       decodeless_offset_ptr
       GIT_REPOSITORY https://github.com/decodeless/offset_ptr.git
-      GIT_TAG main)
+      GIT_TAG 1f87a9d7a8be23b90c06124014f286df91562006)
     FetchContent_MakeAvailable(decodeless_offset_ptr)
   else()
     message(
