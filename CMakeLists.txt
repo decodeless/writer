@@ -6,12 +6,17 @@ project(decodeless_writer)
 
 set(CMAKE_CXX_STANDARD 20)
 
-option(DECODELESS_SEARCH_DEPENDENCIES "Enable searching for dependencies in adjacent directories" ON)
-option(DECODELESS_FETCH_DEPENDENCIES "Enable fetching dependencies with cmake FetchContent" OFF)
+option(DECODELESS_SEARCH_DEPENDENCIES
+       "Enable searching for dependencies in adjacent directories" ON)
+option(DECODELESS_FETCH_DEPENDENCIES
+       "Enable fetching dependencies with cmake FetchContent" OFF)
 
 if(NOT TARGET decodeless::allocator)
   if(DECODELESS_SEARCH_DEPENDENCIES)
-    find_package(decodeless_allocator REQUIRED CONFIG PATHS "${CMAKE_CURRENT_LIST_DIR}/../allocator")
+    option(DECODELESS_ALLOCATOR_SEARCH_PATH
+           "${CMAKE_CURRENT_LIST_DIR}/../allocator")
+    find_package(decodeless_allocator REQUIRED CONFIG PATHS
+                 "${DECODELESS_ALLOCATOR_SEARCH_PATH}")
   elseif(DECODELESS_FETCH_DEPENDENCIES)
     include(FetchContent)
     FetchContent_Declare(
@@ -29,7 +34,10 @@ endif()
 
 if(NOT TARGET decodeless::mappedfile)
   if(DECODELESS_SEARCH_DEPENDENCIES)
-    find_package(decodeless_mappedfile REQUIRED CONFIG PATHS "${CMAKE_CURRENT_LIST_DIR}/../mappedfile")
+    option(DECODELESS_MAPPEDFILE_SEARCH_PATH
+           "${CMAKE_CURRENT_LIST_DIR}/../mappedfile")
+    find_package(decodeless_mappedfile REQUIRED CONFIG PATHS
+                 "${DECODELESS_MAPPEDFILE_SEARCH_PATH}")
   elseif(DECODELESS_FETCH_DEPENDENCIES)
     include(FetchContent)
     FetchContent_Declare(
@@ -47,10 +55,8 @@ endif()
 
 add_library(decodeless_writer INTERFACE)
 target_include_directories(decodeless_writer INTERFACE include)
-target_link_libraries(
-  decodeless_writer
-  INTERFACE decodeless::allocator
-            decodeless::mappedfile)
+target_link_libraries(decodeless_writer INTERFACE decodeless::allocator
+                                                  decodeless::mappedfile)
 
 add_library(decodeless::writer ALIAS decodeless_writer)
 

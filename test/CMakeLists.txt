@@ -15,8 +15,10 @@ endif()
 
 if(NOT TARGET decodeless::offset_ptr)
   if(DECODELESS_SEARCH_DEPENDENCIES)
+    option(DECODELESS_OFFSET_PTR_SEARCH_PATH
+           "${CMAKE_CURRENT_LIST_DIR}/../offset_ptr")
     find_package(decodeless_offset_ptr REQUIRED CONFIG PATHS
-                 "${CMAKE_CURRENT_LIST_DIR}/../../offset_ptr")
+                 "${DECODELESS_OFFSET_PTR_SEARCH_PATH}")
   elseif(DECODELESS_FETCH_DEPENDENCIES)
     include(FetchContent)
     FetchContent_Declare(
