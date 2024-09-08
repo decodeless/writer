@@ -105,8 +105,9 @@ class file_writer {
 public:
     using memory_resource_type = linear_file_memory_resource;
     using allocator_type = memory_resource_ref<std::byte, memory_resource_type>;
-    static constexpr size_t INITIAL_SIZE = memory_resource_type::INITIAL_SIZE;
-    file_writer(const fs::path& path, size_t maxSize, size_t initialSize = INITIAL_SIZE)
+    file_writer(const fs::path& path, size_t maxSize)
+        : m_linearResource(mapped_file_memory_resource(path, maxSize)) {}
+    file_writer(const fs::path& path, size_t maxSize, size_t initialSize)
         : m_linearResource(initialSize, mapped_file_memory_resource(path, maxSize)) {}
     [[nodiscard]] memory_resource_type& resource() { return m_linearResource; }
     [[nodiscard]] allocator_type        allocator() { return m_linearResource; }
@@ -145,8 +146,9 @@ class memory_writer {
 public:
     using memory_resource_type = linear_memory_resource<mapped_memory_memory_resource>;
     using allocator_type = memory_resource_ref<std::byte, memory_resource_type>;
-    static constexpr size_t INITIAL_SIZE = memory_resource_type::INITIAL_SIZE;
-    memory_writer(size_t maxSize, size_t initialSize = INITIAL_SIZE)
+    memory_writer(size_t maxSize)
+        : m_linearResource(mapped_memory_memory_resource(maxSize)) {}
+    memory_writer(size_t maxSize, size_t initialSize)
         : m_linearResource(initialSize, mapped_memory_memory_resource(maxSize)) {}
     [[nodiscard]] memory_resource_type& resource() { return m_linearResource; }
     [[nodiscard]] allocator_type        allocator() { return m_linearResource; }
