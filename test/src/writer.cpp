@@ -8,8 +8,43 @@
 #include <fstream>
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include <ostream>
 
 using namespace decodeless;
+
+TEST(Writer, CreateEmpty) {
+    fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
+    EXPECT_FALSE(std::filesystem::exists(tmpFile));
+    { file_writer writer(tmpFile, 4096); }
+    EXPECT_EQ(std::filesystem::file_size(tmpFile), 0);
+    fs::remove(tmpFile);
+}
+
+// Perhaps controversial, but a "writer" is generally going to create files from
+// scratch and should clear existing files by default to rewrite them. In
+// contrast, the decodeless::resizable_file will keep the initial contents.
+// Without this, re-running a write operation could silently append to the file
+// instead, which IMO would be more surprising and bug prone.
+TEST(Writer, ClearExisting) {
+    fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
+    { std::ofstream(tmpFile, std::ios::binary).write("abcd", 4); }
+    EXPECT_TRUE(std::filesystem::exists(tmpFile));
+    EXPECT_EQ(std::filesystem::file_size(tmpFile), 4);
+    { file_writer writer(tmpFile, 4096); }
+    EXPECT_EQ(std::filesystem::file_size(tmpFile), 0);
+    fs::remove(tmpFile);
+}
+
+TEST(Writer, CreateFromEmpty) {
+    fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";
+    EXPECT_FALSE(std::filesystem::exists(tmpFile));
+    {
+        file_writer writer(tmpFile, 4096);
+        writer.create<int>(42);
+    }
+    EXPECT_EQ(std::filesystem::file_size(tmpFile), sizeof(int));
+    fs::remove(tmpFile);
+}
 
 TEST(Writer, Simple) {
     fs::path tmpFile = fs::path{testing::TempDir()} / "test.dat";

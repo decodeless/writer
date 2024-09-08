@@ -15,8 +15,9 @@ class pmr_file_writer {
 public:
     using memory_resource_type = memory_resource_adapter<linear_file_memory_resource>;
     using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
-    static constexpr size_t INITIAL_SIZE = linear_file_memory_resource::INITIAL_SIZE;
-    pmr_file_writer(const fs::path& path, size_t maxSize, size_t initialSize = INITIAL_SIZE)
+    pmr_file_writer(const fs::path& path, size_t maxSize)
+        : m_linearResource(mapped_file_memory_resource(path, maxSize)) {}
+    pmr_file_writer(const fs::path& path, size_t maxSize, size_t initialSize)
         : m_linearResource(initialSize, mapped_file_memory_resource(path, maxSize)) {}
     [[nodiscard]] memory_resource_type& resource() { return m_linearResource; }
     [[nodiscard]] allocator_type        allocator() { return &m_linearResource; }
@@ -57,9 +58,9 @@ public:
     using memory_resource_type =
         memory_resource_adapter<linear_memory_resource<mapped_memory_memory_resource>>;
     using allocator_type = std::pmr::polymorphic_allocator<std::byte>;
-    static constexpr size_t INITIAL_SIZE =
-        linear_memory_resource<mapped_memory_memory_resource>::INITIAL_SIZE;
-    pmr_memory_writer(size_t maxSize, size_t initialSize = INITIAL_SIZE)
+    pmr_memory_writer(size_t maxSize)
+        : m_linearResource(mapped_memory_memory_resource(maxSize)) {}
+    pmr_memory_writer(size_t maxSize, size_t initialSize)
         : m_linearResource(initialSize, mapped_memory_memory_resource(maxSize)) {}
     [[nodiscard]] memory_resource_type& resource() { return m_linearResource; }
     [[nodiscard]] allocator_type        allocator() { return &m_linearResource; }
