@@ -22,7 +22,7 @@ if(NOT TARGET decodeless::allocator)
     FetchContent_Declare(
       decodeless_allocator
       GIT_REPOSITORY https://github.com/decodeless/allocator.git
-      GIT_TAG 772bcb7e0c0f5bbdf3358395046e995a9d6c1ffb)
+      GIT_TAG 976a34bd7f9784839dd9bba05262001a498f5ce4)
     FetchContent_MakeAvailable(decodeless_allocator)
   else()
     message(
