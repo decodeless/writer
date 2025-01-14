@@ -43,7 +43,7 @@ if(NOT TARGET decodeless::mappedfile)
     FetchContent_Declare(
       decodeless_mappedfile
       GIT_REPOSITORY https://github.com/decodeless/mappedfile.git
-      GIT_TAG a6e59f8b193298a16534beab694e30ae76d7f457)
+      GIT_TAG a214250f70d218c055ef7b82f45f987183dceecf)
     FetchContent_MakeAvailable(decodeless_mappedfile)
   else()
     message(
