@@ -1,4 +1,4 @@
-# Copyright (c) 2024 Pyarelal Knowles, MIT License
+# Copyright (c) 2024-2025 Pyarelal Knowles, MIT License
 
 cmake_minimum_required(VERSION 3.20)
 
@@ -22,7 +22,7 @@ if(NOT TARGET decodeless::allocator)
     FetchContent_Declare(
       decodeless_allocator
       GIT_REPOSITORY https://github.com/decodeless/allocator.git
-      GIT_TAG 976a34bd7f9784839dd9bba05262001a498f5ce4)
+      GIT_TAG 9b45b23ea556ae5ec42af4ce60b13bd3a7db8a8f)
     FetchContent_MakeAvailable(decodeless_allocator)
   else()
     message(
@@ -43,7 +43,7 @@ if(NOT TARGET decodeless::mappedfile)
     FetchContent_Declare(
       decodeless_mappedfile
       GIT_REPOSITORY https://github.com/decodeless/mappedfile.git
-      GIT_TAG bbd066e089210ac06063a9d4e278749b275fffe9)
+      GIT_TAG a6e59f8b193298a16534beab694e30ae76d7f457)
     FetchContent_MakeAvailable(decodeless_mappedfile)
   else()
     message(
